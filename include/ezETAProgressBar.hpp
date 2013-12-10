@@ -30,52 +30,51 @@ namespace ez {
 // remaining).
 // 90% [========================================>     ] ETA 12d 23h 56s
 
-  namespace details{
+namespace details{
 //type and shorthand
-    using weeks = std::chrono::duration<size_t, std::ratio<604800> >;
-    using days = std::chrono::duration<size_t, std::ratio<86400> >;
-    using hours = std::chrono::hours;
-    using minutes = std::chrono::minutes;
-    using seconds = std::chrono::seconds;
-    using clock =  std::chrono::system_clock;
-    using duration = std::chrono::duration<size_t, clock::period>;
-    using time_t = clock::time_point;
-    using partialDuration = std::chrono::duration<double, clock::period>;
+using weeks = std::chrono::duration<size_t, std::ratio<604800> >;
+using days = std::chrono::duration<size_t, std::ratio<86400> >;
+using hours = std::chrono::hours;
+using minutes = std::chrono::minutes;
+using seconds = std::chrono::seconds;
+using clock =  std::chrono::system_clock;
+using duration = std::chrono::duration<size_t, clock::period>;
+using time_t = clock::time_point;
 
-    std::string durationString(duration t) {
-      using std::chrono::duration_cast;
+std::string durationString(duration t) {
+  using std::chrono::duration_cast;
 
-      std::stringstream out(std::stringstream::out);
+  std::stringstream out(std::stringstream::out);
 
-      if ( t >= days(1) ) {
-        auto numDays = duration_cast<days>(t);
-        out << numDays.count() << "d ";
-        t -= numDays;
-      }
-
-      if ( t >= hours(1) ) {
-        auto numHours = duration_cast<hours>(t);
-        out << numHours.count() << "h ";
-        t -= numHours;
-      }
-
-      if ( t >= minutes(1) ) {
-        auto numMins = duration_cast<minutes>(t);
-        out << numMins.count() << "m ";
-        t -= numMins;
-      }
-
-      if (t >= seconds(1)) {
-        auto numSecs = duration_cast<seconds>(t);
-        out << numSecs.count() << "s";
-      }
-
-      std::string tstring = out.str();
-      if (tstring.empty()) { tstring = "0s";  }
-      
-      return tstring;
-    }
+  if ( t >= days(1) ) {
+    auto numDays = duration_cast<days>(t);
+    out << numDays.count() << "d ";
+    t -= numDays;
   }
+
+  if ( t >= hours(1) ) {
+    auto numHours = duration_cast<hours>(t);
+    out << numHours.count() << "h ";
+    t -= numHours;
+  }
+
+  if ( t >= minutes(1) ) {
+    auto numMins = duration_cast<minutes>(t);
+    out << numMins.count() << "m ";
+    t -= numMins;
+  }
+
+  if (t >= seconds(1)) {
+    auto numSecs = duration_cast<seconds>(t);
+    out << numSecs.count() << "s";
+  }
+
+  std::string tstring = out.str();
+  if (tstring.empty()) { tstring = "0s";  }
+  
+  return tstring;
+}
+}//details namespace
 
 class ezETAProgressBar {
 private:
@@ -113,7 +112,7 @@ public:
     cur += d;
     
     endTime = clock::now();
-    if ( (endTime - lastCheck) >= std::chrono::seconds(1) or (cur == n) ) {
+    if ( (endTime - lastCheck) >= seconds(1) or (cur == n) ) {
       setPct(static_cast<double>(cur) / n);
       lastCheck = endTime;
     }
@@ -135,7 +134,6 @@ public:
     os << " " <<setw(2+3+digits+1) << fixed <<setprecision(digits) << 100*Pct <<"%";
 
     // Compute how many tics we can display.
-    //int nticsMax = (width - 27 - digits - 1 -1);
     unsigned ntics = std::max(0, static_cast<int>(nticsMax * Pct));
     
     os << " [";
