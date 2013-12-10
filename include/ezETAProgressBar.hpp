@@ -17,182 +17,173 @@ v2.0.2 20130123 rob Switched over to C++11 timer facilities
 #include <string>
 #include <sstream>
 #include <chrono>
-#include <cstdio>
 #include <cstring>
-#include <cassert>
+#include <iomanip>
 
 #ifdef WIN32
 #include <windows.h>
-#else
-#include <sys/time.h>
-#include <sys/ioctl.h>
 #endif
 
+//TODO:isolate timer
 namespace ez {
-// One-line refreshing progress bar inspired by wget that shows ETA (time remaining).
+// One-line refreshing progress bar inspired by wget that shows ETA (time
+// remaining).
 // 90% [========================================>     ] ETA 12d 23h 56s
+
+  namespace details{
+//type and shorthand
+    using weeks = std::chrono::duration<size_t, std::ratio<604800> >;
+    using days = std::chrono::duration<size_t, std::ratio<86400> >;
+    using hours = std::chrono::hours;
+    using minutes = std::chrono::minutes;
+    using seconds = std::chrono::seconds;
+    using clock =  std::chrono::system_clock;
+    using duration = std::chrono::duration<size_t, clock::period>;
+    using time_t = clock::time_point;
+    using partialDuration = std::chrono::duration<double, clock::period>;
+
+    std::string durationString(duration t) {
+      using std::chrono::duration_cast;
+
+      std::stringstream out(std::stringstream::out);
+
+      if ( t >= days(1) ) {
+        auto numDays = duration_cast<days>(t);
+        out << numDays.count() << "d ";
+        t -= numDays;
+      }
+
+      if ( t >= hours(1) ) {
+        auto numHours = duration_cast<hours>(t);
+        out << numHours.count() << "h ";
+        t -= numHours;
+      }
+
+      if ( t >= minutes(1) ) {
+        auto numMins = duration_cast<minutes>(t);
+        out << numMins.count() << "m ";
+        t -= numMins;
+      }
+
+      if (t >= seconds(1)) {
+        auto numSecs = duration_cast<seconds>(t);
+        out << numSecs.count() << "s";
+      }
+
+      std::string tstring = out.str();
+      if (tstring.empty()) { tstring = "0s";  }
+      
+      return tstring;
+    }
+  }
+
 class ezETAProgressBar {
 private:
-	typedef std::chrono::system_clock system_clock;
-	typedef std::chrono::duration<size_t, system_clock::period> duration;
-	typedef std::chrono::duration<double, system_clock::period> partialDuration;
+//private variable
+  uint64_t n;
+  uint64_t cur;
+  unsigned digits;
+  unsigned nticsMax;
+  unsigned char width; // How many chars the entire line can be.
+  details::time_t startTime, endTime, lastCheck;
+  std::ostream& OS;
 public:
-	ezETAProgressBar(unsigned int _n=0) : n(_n), pct(0), cur(0), width(80) {}
-	void reset( uint64_t _n ) { n = _n; pct = 0; cur = 0; }
-	void start() { 
-		startTime = system_clock::now();
-		lastCheck = startTime;
-		setPct(0); 
-	}
-	
-	void operator++() {
-		if (cur >= n) return;
-		++cur;		
-		endTime = system_clock::now();
-		if ( (endTime - lastCheck) >= std::chrono::seconds(1) or (cur == n) ) {
-			setPct( static_cast<double>(cur)/n );
-			lastCheck = endTime;
-		}
-	};
+  ezETAProgressBar(uint64_t _n = 0) : n(_n), cur(0), digits(1),width(80), OS(std::cout) {
+    nticsMax = (width - 27 - digits - 1 -1);
+  }
+  
+  void reset(uint64_t _n) { n = _n; cur = 0; }
+  
+  void done() {  cur = n;  setPct(1.0);  }
+  
+  void start() {
+    using namespace details;
+    using namespace std;
+    lastCheck = startTime = clock::now();
+    OS << " " <<setw(2+3+digits+1) << fixed <<setprecision(digits) << 0 <<"%";
+    OS << " [>"<< string(nticsMax,' ')<<"] Estimating...\r"<<flush;
+  }
 
-	void operator+=( const unsigned int d ) {
-		if (cur >= n) return;
-		cur += d;
-		endTime = system_clock::now();
-		if ( (endTime - lastCheck) >= std::chrono::seconds(1) or (cur == n) ) {
-			setPct(static_cast<double>(cur)/n);
-			lastCheck = endTime;
-		}
-	};
+  void operator++() { (*this) += 1; }
 
-	void done() {
-		cur = n;
-		setPct(1.0);
-	}
+  void operator+=(const unsigned int d) {
+    using namespace details;
+    if (cur >= n)  return;
+    
+    cur += d;
+    
+    endTime = clock::now();
+    if ( (endTime - lastCheck) >= std::chrono::seconds(1) or (cur == n) ) {
+      setPct(static_cast<double>(cur) / n);
+      lastCheck = endTime;
+    }
+  }
 
-	std::string durationString( duration t ) {
-		using std::chrono::duration_cast;
-		typedef std::chrono::duration<size_t, std::ratio<86400>> days;
-		using std::chrono::hours;
-		using std::chrono::minutes;
-		using std::chrono::seconds;
+  // Set 0.0-1.0, where 1.0 equals 100%.
+  void setPct(double Pct) {
+    using namespace details;
+    using namespace std;
+    using std::chrono::duration_cast;
+    
+    if ( Pct <= 0.0 ) return;
 
-		std::stringstream out(std::stringstream::out);
-		//std::string out;
-		
-		if ( t >= days(1) ) {
-			auto numDays = duration_cast<days>(t);
-			out << numDays.count() << "d ";
-			t -= numDays;
-		}
-		
-		if ( t >= hours(1) ) {
-			auto numHours = duration_cast<hours>(t);
-			out << numHours.count() << "h ";
-			t -= numHours;
-		}
+    stringstream os;
 
-		if ( t >= minutes(1) ) { 
-			auto numMins = duration_cast<minutes>(t);
-			out << numMins.count() << "m ";
-			t -= numMins;
-		}
-		
-		if ( t >= seconds(1) ) {
-			auto numSecs = duration_cast<seconds>(t);
-			out << numSecs.count() << "s";
-		}
-		
-		std::string tstring = out.str();
-		if (tstring.empty()) { tstring = "0s"; }
-		return tstring;
-	}
-	
-	// Set 0.0-1.0, where 1.0 equals 100%.
-	void setPct(double Pct) {
-		using std::chrono::duration_cast;
-		using std::chrono::seconds;
-		typedef std::chrono::duration<size_t, std::ratio<604800>> weeks;
+    int effLen = 0;
 
-		endTime = system_clock::now();
-		char pctstr[5];
-		sprintf(pctstr, "%3d%%", (int)(100*Pct));
+    endTime = clock::now();
+    os << " " <<setw(2+3+digits+1) << fixed <<setprecision(digits) << 100*Pct <<"%";
 
-		// Compute how many tics we can display.
-		int nticsMax = (width-27);
-		int ntics = std::max(1, static_cast<int>(nticsMax*Pct));
-		std::string out(pctstr);
-		out.append(" [");
+    // Compute how many tics we can display.
+    //int nticsMax = (width - 27 - digits - 1 -1);
+    unsigned ntics = std::max(0, static_cast<int>(nticsMax * Pct));
+    
+    os << " [";
 
-		#ifdef HAVE_ANSI_TERM
-		// Green!
-		out.append("\e[0;32m");
-		#endif //HAVE_ANSI_TERM
+#ifdef HAVE_ANSI_TERM
+    // Green!
+    os << "\e[0;32m" ;
+#endif // HAVE_ANSI_TERM
 
-		out.append(std::max(0,ntics-1),'=');
-		out.append( Pct == 1.0 ? "=" : ">");
-		out.append(nticsMax-ntics,' ');
+    os << string( ntics , '=');
+    os << (Pct == 1.0 ? "=" : ">");
+    os << string(nticsMax - ntics, ' ');
 
-		#ifdef HAVE_ANSI_TERM
-		// Not-Green :(
-		out.append("\e[0m");
-		#endif //HAVE_ANSI_TERM
+#ifdef HAVE_ANSI_TERM
+    // Not-Green :(
+    os << "\e[0m";
+    effLen -= 11;
+#endif // HAVE_ANSI_TERM
 
-		out.append("] ");
-		out.append((Pct<1.0) ? "ETA " : "in ");
+    os << "] ";
 
-		// Time since we started the progress bar (or reset)
-		auto dt = endTime-startTime;
+    // Time since we started the progress bar (or reset)
+    auto dt = endTime - startTime;
 
-		std::string tstr;
-		if (Pct >= 1.0) {
-			// Print overall time and newline.
-			tstr = durationString(dt);
-			out.append(tstr);
-			if (out.size() < width)
-				out.append(width-out.size(),' ');
+    std::string terminator;
+    if (Pct >= 1.0) {
+      // job Done,Print overall time and newline.
+      os << "Finished in "<<durationString(dt) ;
+      terminator = "\n";
+    } else {
+      // job going on 
+      duration esecs = duration_cast<seconds>(dt);
+      duration eta = duration_cast<duration>(((esecs * n) / cur) - esecs);
+      os << "ETA ";
+      if (eta > weeks(1)) {  os << "> 1 week";           } 
+      else                {  os << durationString(eta);  }
+      terminator = "\r";
+    }
 
-			out.append("\n");
-			std::cout << out;
-			return;
-		} else {
-			duration eta = std::chrono::seconds::max();
+    effLen += os.str().size();
 
-			if (Pct > 0.0) {
-				duration esecs = duration_cast<seconds>(dt);
-				eta = duration_cast<duration>( ((esecs * n) / cur) - esecs );
-			}
+    // Pad to remove previously leftover string
+    int padding = width - effLen;
+    if ( padding > 0 ) {  os<< string( padding , ' ');  }
+    OS << os.str() << terminator  << flush;
 
-			if ( eta > weeks(1) ) {
-				out.append("> 1 week");
-			} else {
-				tstr = durationString(eta);
-				out.append(tstr);
-			}
-		}
+  }
 
-		size_t effLen = out.length();
-	    #ifdef HAVE_ANSI_TERM
-		 effLen -= 11;
-		#endif //HAVE_ANSI_TERM
-
-		// Pad end with spaces to overwrite previous string that may have been longer.
-		if (effLen < width) {
-			out.append(width-effLen,' ');
-		}
-
-			
-		out.append("\r");
-		std::cout << out;
-		std::cout.flush();
-	}
-
-	private:
-		uint64_t n;
-		uint64_t cur;
-	    unsigned short pct; // Stored as 0-1000, so 2.5% is encoded as 25.
-	    unsigned char width; // How many chars the entire line can be.
-	    std::chrono::system_clock::time_point startTime, endTime, lastCheck;
 };
 }
 #endif // EZ_ETAPROGRESSBAR_H

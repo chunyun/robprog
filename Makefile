@@ -1,7 +1,7 @@
 CC = /opt/centos/devtoolset-1.1/root/usr/bin/g++ 
 CCINC = -I ./include/ 
 
-DEFINES = #-DDEBUG
+DEFINES = -DHAVE_ANSI_TERM
 CCFLAGS = -std=c++11 -Wall $(DEFINES)
 CCProfFLAGS = -ggdb -pg
 CCLIBS =
@@ -26,7 +26,7 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
 	$(CC) -c $< -o $@ $(CCINC) $(CCFLAGS)
 
 clean:
-	rm -rf $(OBJ)
+	rm -rf $(CPPOBJ)
 
 cleanall: 
 	rm -rf $(BINDIR) $(OBJDIR)
