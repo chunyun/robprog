@@ -80,14 +80,14 @@ class ezETAProgressBar {
 private:
 //private variable
   uint64_t n;
-  uint64_t cur;
-  unsigned digits;
+  uint64_t cur{0};
+  unsigned digits{1};
   unsigned nticsMax;
-  unsigned char width; // How many chars the entire line can be.
+  unsigned char width{80}; // How many chars the entire line can be.
   details::time_t startTime, endTime, lastCheck;
-  std::ostream& OS;
+  std::ostream& OS{std::cout};
 public:
-  ezETAProgressBar(uint64_t _n = 0) : n(_n), cur(0), digits(1),width(80), OS(std::cout) {
+  ezETAProgressBar(uint64_t _n = 0) : n(_n) {
     nticsMax = (width - 27 - digits - 1 -1);
   }
   
